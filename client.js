@@ -13,9 +13,15 @@ window.__ModuleLoader__.load({
     ]);
     const rangeKeys = new Set(['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End', 'PageUp', 'PageDown']);
     const thumbSize = 31;
+    const progressProperty = '--dsh-hk-progress';
+    const maxNotice = '消耗额度更快';
 
     function isTrusted(event) {
       return event.nativeEvent?.isTrusted === true;
+    }
+
+    function anchorNameFor(id) {
+      return `--dsh-hk-${id.replace(/[^a-zA-Z0-9_-]/g, '')}`;
     }
 
     const styles = `
@@ -62,6 +68,7 @@ window.__ModuleLoader__.load({
         box-shadow:var(--dsw-elevation-prominent,0 10px 32px #16234524);
         font-family:var(--dsw-font-family,system-ui,sans-serif);
       }
+      .dsh-hk-popup[data-view="effort"] {overflow:visible}
       .dsh-hk .dsh-hk-trigger {
         display:flex;
         align-items:center;
@@ -203,6 +210,26 @@ window.__ModuleLoader__.load({
       }
       .dsh-hk-meta {grid-area:1/2;min-width:0;text-align:center}
       .dsh-hk-head[data-effort="max"] .dsh-hk-value {color:var(--hk-max-text)}
+      .dsh-hk-max-notice {
+        --hk-notice-blue:#2549cc;
+        --hk-notice-purple:#7342d7;
+        display:inline-block;
+        color:transparent;
+        background:linear-gradient(100deg,var(--hk-notice-blue),var(--hk-notice-purple) 35%,#5d53da 50%,var(--hk-notice-blue) 70%,var(--hk-notice-purple));
+        background-size:240% 100%;
+        background-clip:text;
+        animation:dsh-hk-notice-flow 1.65s ease-in-out infinite alternate;
+      }
+      [data-ds-dark-theme] .dsh-hk-max-notice {--hk-notice-blue:#87a8ff;--hk-notice-purple:#d4a5ff}
+      @keyframes dsh-hk-notice-flow {from {background-position:0 50%} to {background-position:100% 50%}}
+      .dsh-hk-announcement {
+        position:absolute;
+        width:1px;
+        height:1px;
+        overflow:hidden;
+        clip-path:inset(50%);
+        white-space:nowrap;
+      }
       .dsh-hk button.dsh-hk-restore {
         width:100%;
         min-height:32px;
@@ -211,8 +238,9 @@ window.__ModuleLoader__.load({
         border-radius:6px;
         font-size:13px;
       }
-      .dsh-hk-team {position:relative;display:inline-flex}
+      .dsh-hk-tip-anchor {position:relative;display:inline-flex}
       .dsh-hk-head>.dsh-hk-team {grid-area:1/1;justify-self:start}
+      .dsh-hk-head>.dsh-hk-native {grid-area:1/3;justify-self:end}
       .dsh-hk button.dsh-hk-bolt {
         display:grid;
         width:28px;
@@ -231,25 +259,28 @@ window.__ModuleLoader__.load({
       .dsh-hk-bolt svg {width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:1.65;stroke-linejoin:round}
       .dsh-hk-bolt[aria-checked=true] svg {fill:currentColor}
       .dsh-hk-tip {
+        --hk-tip-width:96px;
         display:none;
-        position:absolute;
-        z-index:4;
-        left:0;
-        top:calc(100% + 4px);
-        min-width:96px;
-        padding:7px 9px;
-        border-radius:8px;
-        background:#181f29;
+        position:fixed;
+        z-index:5;
+        inset:auto auto calc(anchor(top) + 5px) clamp(6px,calc(anchor(center) - var(--hk-tip-width) / 2),calc(100vw - 6px - var(--hk-tip-width)));
+        position-try-fallbacks:flip-block;
+        width:var(--hk-tip-width);
+        padding:7px 10px;
+        border:1px solid #ffffff17;
+        border-radius:16px;
+        background:#1b1e21;
         color:#fff;
-        box-shadow:0 4px 12px #0004;
-        line-height:1.35;
+        box-shadow:0 6px 18px #0004;
+        line-height:1.4;
         white-space:nowrap;
         pointer-events:none;
       }
       .dsh-hk-tip strong,.dsh-hk-tip small {display:block}
-      .dsh-hk-tip strong {font-size:14px;font-weight:600}
-      .dsh-hk-tip small {color:#bec5d0;font-size:11px}
-      .dsh-hk-team:hover .dsh-hk-tip,.dsh-hk-team:focus-within .dsh-hk-tip {display:block}
+      .dsh-hk-tip strong {font-size:13px;font-weight:600}
+      .dsh-hk-tip small {color:#b1b1b1;font-size:11px}
+      .dsh-hk-native .dsh-hk-tip {--hk-tip-width:104px;text-align:center}
+      .dsh-hk-tip-anchor:hover .dsh-hk-tip,.dsh-hk-tip-anchor:has(button:focus-visible) .dsh-hk-tip {display:block}
       .dsh-hk-rail {
         position:relative;
         height:39px;
@@ -339,7 +370,7 @@ window.__ModuleLoader__.load({
       .dsh-hk-burst {
         position:absolute;
         top:50%;
-        left:var(--hk-thumb-x);
+        left:calc(11px + (100% - 22px) * var(--hk-max-stop) / var(--hk-steps));
         pointer-events:none;
         z-index:1;
       }
@@ -356,12 +387,10 @@ window.__ModuleLoader__.load({
         18% {opacity:.85}
         100% {opacity:0;transform:rotate(var(--hk-angle)) translateX(var(--hk-radius))}
       }
-      .dsh-hk-tick,.dsh-hk-marks span {
+      .dsh-hk-tick {
         position:absolute;
         left:calc(11px + (100% - 22px) * var(--hk-stop));
         transform:translateX(-50%);
-      }
-      .dsh-hk-tick {
         top:calc(50% - 2px);
         width:4px;
         height:4px;
@@ -408,24 +437,7 @@ window.__ModuleLoader__.load({
       .dsh-hk-rail[data-drag] {cursor:grabbing}
       .dsh-hk-rail[data-node-hover] {cursor:pointer}
       .dsh-hk-rail:has(.dsh-hk-range:disabled) {cursor:default}
-      .dsh-hk-marks {
-        position:relative;
-        height:14px;
-        font-size:10px;
-        line-height:14px;
-        color:var(--hk-muted);
-      }
-      .dsh-hk-marks span {
-        max-width:min(48px,calc((100% - 22px) / var(--hk-label-steps)));
-        overflow:hidden;
-        text-align:center;
-        text-overflow:ellipsis;
-        white-space:nowrap;
-      }
-      .dsh-hk-marks [data-selected] {color:var(--hk-fg);font-weight:650}
-      .dsh-hk-rail[data-effort="max"] + .dsh-hk-marks [data-selected] {color:var(--hk-max-text)}
       .dsh-hk-head button[data-dsh-hk-native] {
-        grid-area:1/3;
         display:grid;
         place-items:center;
         width:28px;height:28px;border-radius:8px;color:var(--hk-muted);padding:0
@@ -437,11 +449,13 @@ window.__ModuleLoader__.load({
       @media (prefers-reduced-motion:reduce) {
         .dsh-hk-star,.dsh-hk-burst,.dsh-hk-fill [data-layer]::after {display:none;animation:none!important}
         .dsh-hk-rail,.dsh-hk-tick {transition:none!important}
+        .dsh-hk-max-notice {animation:none}
       }
       @media (forced-colors:active) {
         .dsh-hk-lane {outline:1px solid CanvasText;outline-offset:-1px}
         .dsh-hk-thumb {border-color:CanvasText}
         .dsh-hk-tick {background:CanvasText;forced-color-adjust:none}
+        .dsh-hk-max-notice {color:CanvasText;background:none}
       }
     `;
 
@@ -455,6 +469,55 @@ window.__ModuleLoader__.load({
       }));
     }
 
+    function labelText(name, fallback) {
+      return (typeof name === 'string' && name.replace(/[\p{Cc}\p{Bidi_Control}]/gu, '').trim()) || fallback;
+    }
+
+    function isRouteId(value) {
+      return typeof value === 'string' && value.length > 0;
+    }
+
+    function modelSnapshot(store) {
+      const snapshots = new WeakMap();
+      const catalogs = new WeakMap();
+      function selectionOf(selection) {
+        if (!isRouteId(selection?.provider) || !isRouteId(selection?.model)) return null;
+        return {
+          provider: selection.provider, model: selection.model,
+          reasoningEffort: isRouteId(selection.reasoningEffort) ? selection.reasoningEffort : undefined,
+        };
+      }
+      return () => {
+        const source = store.getSnapshot();
+        if (snapshots.has(source)) return snapshots.get(source);
+        const catalog = source.groups;
+        let groups = catalogs.get(catalog);
+        if (!groups) {
+          groups = (Array.isArray(catalog) ? catalog : []).filter(group => isRouteId(group?.id) && Array.isArray(group.models)).map(group => ({
+            id: group.id, name: labelText(group.name, '未命名提供商'),
+            models: group.models.filter(option => isRouteId(option?.id)).map(option => {
+              const raw = option.reasoning;
+              const reasoning = Array.isArray(raw?.efforts) ? {
+                defaultEffort: isRouteId(raw.defaultEffort) ? raw.defaultEffort : undefined,
+                efforts: raw.efforts.filter(level => isRouteId(level?.id)).map(level => ({
+                  id: level.id, name: labelText(level.name, '自定义档位'),
+                })),
+              } : undefined;
+              return { id: option.id, name: labelText(option.name, '未命名模型'), reasoning };
+            }),
+          }));
+          if (Array.isArray(catalog)) catalogs.set(catalog, groups);
+        }
+        // Diagnostics, task contents, and provider connection settings are outside the UI contract.
+        const snapshot = {
+          groups, current: selectionOf(source.current), pending: selectionOf(source.pending),
+          loading: source.status === 'loading',
+        };
+        snapshots.set(source, snapshot);
+        return snapshot;
+      };
+    }
+
     function getModel(state) {
       const current = state.current;
       if (!current) return null;
@@ -466,8 +529,7 @@ window.__ModuleLoader__.load({
       if (reasoning.defaultEffort === undefined) entries.set(undefined, '默认');
       for (const entry of reasoning.efforts) {
         if (typeof entry?.id === 'string' && entry.id) {
-          const label = typeof entry.name === 'string' && entry.name ? entry.name : entry.id;
-          entries.set(entry.id, caption.get(entry.id) ?? label);
+          entries.set(entry.id, caption.get(entry.id) ?? entry.name);
         }
       }
       const ids = [...entries.keys()];
@@ -486,8 +548,9 @@ window.__ModuleLoader__.load({
       };
     }
 
-    function TeamSwitch({ enabled, disabled, history, teamActions, reportFailure, close }) {
+    function TeamSwitch({ enabled, disabled, needsDisableConfirmation, teamActions, reportFailure, close }) {
       const tooltipId = useId();
+      const anchorName = anchorNameFor(tooltipId);
       const saving = useRef(false);
       const [pending, setPending] = useState(false);
       async function toggle(event) {
@@ -495,7 +558,7 @@ window.__ModuleLoader__.load({
         try {
           const actions = teamActions();
           if (!actions) throw new Error('Native team control unavailable');
-          if (enabled && history.lastUsed !== null) {
+          if (enabled && needsDisableConfirmation) {
             if (typeof actions.requestDisableConfirmation !== 'function') {
               throw new Error('Native team confirmation unavailable');
             }
@@ -514,7 +577,7 @@ window.__ModuleLoader__.load({
           setPending(false);
         }
       }
-      return h('span', { className: 'dsh-hk-team' },
+      return h('span', { className: 'dsh-hk-team dsh-hk-tip-anchor', style: { anchorName } },
         h('button', {
           type: 'button', role: 'switch', className: 'dsh-hk-bolt', 'data-dsh-hk-team': '',
           'aria-label': '智能体团队', 'aria-checked': enabled, 'aria-describedby': tooltipId,
@@ -522,7 +585,7 @@ window.__ModuleLoader__.load({
         }, h('svg', { viewBox: '0 0 20 20', 'aria-hidden': true },
           h('path', { d: 'M11.8 1.8 4.2 11h4.5l-.6 7.2 7.7-9.7h-4.5z' }),
         )),
-        h('span', { className: 'dsh-hk-tip', id: tooltipId, role: 'tooltip' },
+        h('span', { className: 'dsh-hk-tip', id: tooltipId, role: 'tooltip', style: { positionAnchor: anchorName } },
           h('strong', null, '智能体团队'), h('small', null, enabled ? '开启' : '关闭'),
         ),
       );
@@ -548,28 +611,39 @@ window.__ModuleLoader__.load({
     }
 
     function NativeStyleButton({ onClick }) {
-      return h('button', {
-        type: 'button', 'data-dsh-hk-native': '',
-        title: '切回原生样式', 'aria-label': '切回原生样式',
-        onClick: event => { if (isTrusted(event)) onClick(); },
-      }, h('svg', {
-        className: 'dsh-hk-native-icon', viewBox: '0 0 16 16',
-        'aria-hidden': true, focusable: false,
-      }, h('path', { d: 'M2.7 6.4a5.5 5.5 0 1 1-.1 3.1M2.5 3v3.6h3.6' })));
+      const tooltipId = useId();
+      const anchorName = anchorNameFor(tooltipId);
+      return h('span', { className: 'dsh-hk-native dsh-hk-tip-anchor', style: { anchorName } },
+        h('button', {
+          type: 'button', 'data-dsh-hk-native': '',
+          'aria-label': '切回原生样式', 'aria-describedby': tooltipId,
+          onClick: event => { if (isTrusted(event)) onClick(); },
+        }, h('svg', {
+          className: 'dsh-hk-native-icon', viewBox: '0 0 16 16',
+          'aria-hidden': true, focusable: false,
+        }, h('path', { d: 'M2.7 6.4a5.5 5.5 0 1 1-.1 3.1M2.5 3v3.6h3.6' }))),
+        h('span', { className: 'dsh-hk-tip', id: tooltipId, role: 'tooltip', style: { positionAnchor: anchorName } },
+          h('strong', null, '切回原生样式'),
+        ),
+      );
     }
 
     function PanelBody({ model, directory, state, select, locked, reportFailure, team, modelName, showModels, showNative }) {
       const input = useRef(null);
+      const rail = useRef(null);
       const gesture = useRef(null);
       const saving = useRef(false);
-      const burstSequence = useRef(0);
+      const pendingMax = useRef(false);
+      const cueSequence = useRef(0);
       const [draft, setDraft] = useState(null);
-      const [burst, setBurst] = useState(null);
+      const [maxCue, setMaxCue] = useState(null);
       const [hoveredNode, setHoveredNode] = useState(null);
       const [nodeTravel, setNodeTravel] = useState(false);
       const signature = JSON.stringify([model.provider, model.model, model.ids, model.effort]);
       const last = model.ids.length - 1;
       const denominator = Math.max(1, last);
+      const maxIndex = model.ids.indexOf('max');
+      const maxPosition = maxIndex / denominator;
       const pending = state.pending?.provider === model.provider && state.pending?.model === model.model;
       const pendingEffort = pending ? state.pending.reasoningEffort ?? model.defaultEffort : model.effort;
       const savedIndex = Math.max(0, model.ids.indexOf(pendingEffort));
@@ -579,18 +653,62 @@ window.__ModuleLoader__.load({
       const effort = model.ids[index];
       const name = model.entries.get(effort);
       const blocked = locked || state.pending != null;
+      const noticeShowing = maxCue !== null && effort === 'max';
+
+      function cancelGesture() {
+        const active = gesture.current;
+        if (!active) return;
+        gesture.current = null;
+        pendingMax.current = false;
+        setDraft(null);
+        setMaxCue(null);
+        if (active.target.hasPointerCapture?.(active.id)) active.target.releasePointerCapture(active.id);
+      }
+
+      useLayoutEffect(() => {
+        if (blocked || gesture.current?.signature !== signature) cancelGesture();
+      }, [blocked, signature]);
+      useEffect(() => {
+        const visibilityChanged = () => { if (document.visibilityState === 'hidden') cancelGesture(); };
+        window.addEventListener('blur', cancelGesture);
+        document.addEventListener('visibilitychange', visibilityChanged);
+        return () => {
+          window.removeEventListener('blur', cancelGesture);
+          document.removeEventListener('visibilitychange', visibilityChanged);
+        };
+      }, []);
+
+      function showMaxAtArrival() {
+        const element = rail.current;
+        if (!pendingMax.current || !element || effort !== 'max' || position !== maxPosition) return;
+        const progress = Number.parseFloat(window.getComputedStyle(element).getPropertyValue(progressProperty));
+        if (!Number.isFinite(progress) || Math.abs(progress - maxPosition) > 0.000001 ||
+            element.getAnimations().some(animation => animation.transitionProperty === progressProperty &&
+              (animation.pending || animation.playState === 'running'))) return;
+        pendingMax.current = false;
+        if (dragging && gesture.current) gesture.current.reachedMax = true;
+        setMaxCue(++cueSequence.current);
+      }
+
+      useLayoutEffect(showMaxAtArrival, [position, effort, dragging]);
 
       useEffect(() => {
-        if (effort !== 'max') setBurst(null);
+        if (effort !== 'max') setMaxCue(null);
       }, [effort]);
+      useEffect(() => {
+        if (maxCue === null) return;
+        const timeout = setTimeout(() => setMaxCue(null), 3000);
+        return () => clearTimeout(timeout);
+      }, [maxCue]);
 
-      async function commit(nextIndex, fromNode = false) {
+      async function commit(nextIndex, fromNode = false, cueAtMax = fromNode) {
         if (blocked || saving.current || !Number.isInteger(nextIndex) || nextIndex < 0 || nextIndex > last) return;
         const current = directory.getSnapshot();
         const latest = getModel(current);
         if (current.pending || !latest || latest.provider !== model.provider || latest.model !== model.model ||
             latest.effort !== model.effort || !latest.entries.has(model.ids[nextIndex])) return;
         const next = model.ids[nextIndex];
+        pendingMax.current = next === 'max' && cueAtMax && (!fromNode || latest.effort !== next);
         if (latest.effort === next) return;
         setNodeTravel(fromNode);
         saving.current = true;
@@ -599,12 +717,10 @@ window.__ModuleLoader__.load({
             provider: latest.provider, model: latest.model,
             ...(next === undefined ? {} : { reasoningEffort: next }),
           });
-          if (!result?.ok) {
-            setBurst(null);
-            reportFailure('未能保存推理等级，请重试。');
-          }
+          if (!result?.ok) throw new Error('Unable to select effort');
         } catch {
-          setBurst(null);
+          pendingMax.current = false;
+          setMaxCue(null);
           reportFailure('未能保存推理等级，请重试。');
         } finally {
           saving.current = false;
@@ -613,6 +729,8 @@ window.__ModuleLoader__.load({
 
       function pointAt(event) {
         const rect = event.currentTarget.getBoundingClientRect();
+        if (![event.clientX, event.clientY, rect.left, rect.top, rect.width, rect.height].every(Number.isFinite) ||
+            rect.width <= 22 || rect.height <= 0) return null;
         const span = Math.max(1, rect.width - 22);
         const offset = event.clientX - rect.left - 11;
         const position = Math.min(1, Math.max(0, offset / span));
@@ -626,52 +744,57 @@ window.__ModuleLoader__.load({
       }
 
       function start(event) {
-        if (!isTrusted(event) || blocked || saving.current || last < 1 || event.button !== 0 || gesture.current) return;
+        if (!isTrusted(event) || !event.isPrimary || !Number.isInteger(event.pointerId) || blocked || saving.current ||
+            last < 1 || event.button !== 0 || gesture.current) return;
+        const point = pointAt(event);
+        if (!point) return;
         event.preventDefault();
         try { event.currentTarget.setPointerCapture(event.pointerId); } catch { return; }
-        const { nearest, node } = pointAt(event);
         gesture.current = {
-          id: event.pointerId, signature, startX: event.clientX, index: nearest, node, dragging: false,
+          id: event.pointerId, type: event.pointerType, target: event.currentTarget, signature, startX: event.clientX,
+          position, node: point.node, dragging: false, reachedMax: false,
         };
-        setBurst(null);
+        pendingMax.current = false;
         setHoveredNode(null);
       }
 
       function move(event) {
-        if (!isTrusted(event)) return;
+        if (!isTrusted(event) || !event.isPrimary) return;
+        const point = pointAt(event);
         const active = gesture.current;
         if (!active) {
-          setHoveredNode(blocked || event.pointerType === 'touch' ? null : pointAt(event).node);
+          setHoveredNode(blocked || event.pointerType === 'touch' ? null : point?.node ?? null);
           return;
         }
-        if (active.id !== event.pointerId || active.signature !== signature || blocked) return;
+        if (active.id !== event.pointerId || active.type !== event.pointerType || active.signature !== signature || blocked || !point) return;
         if (!active.dragging) {
           if (Math.abs(event.clientX - active.startX) < 3) return;
           active.dragging = true;
           setNodeTravel(false);
           input.current?.focus({ preventScroll: true });
         }
-        const { position, nearest: nextIndex } = pointAt(event);
-        if (model.ids[nextIndex] !== 'max') {
-          setBurst(null);
-        } else if (model.ids[active.index] !== 'max') {
-          setBurst(++burstSequence.current);
+        const { position: nextPosition } = point;
+        if (nextPosition !== maxPosition) {
+          pendingMax.current = false;
+        } else if (!active.reachedMax && active.position !== maxPosition) {
+          pendingMax.current = true;
         }
-        active.index = nextIndex;
-        setDraft({ signature, position });
+        active.position = nextPosition;
+        setDraft({ signature, position: nextPosition });
       }
 
       function finish(event, accept) {
         if (!isTrusted(event)) return;
         const active = gesture.current;
-        if (active?.id !== event.pointerId) return;
-        gesture.current = null;
-        setDraft(null);
-        if (!accept || active.signature !== signature || blocked) {
-          setBurst(null);
+        if (!active || active.id !== event.pointerId || active.type !== event.pointerType) return;
+        const point = accept && event.isPrimary && !blocked && active.signature === signature ? pointAt(event) : null;
+        if (!point) {
+          cancelGesture();
           return;
         }
-        const { nearest, node } = pointAt(event);
+        gesture.current = null;
+        setDraft(null);
+        const { nearest, node } = point;
         if (!active.dragging) {
           if (node !== null && node === active.node) {
             input.current?.focus({ preventScroll: true });
@@ -679,40 +802,47 @@ window.__ModuleLoader__.load({
           }
           return;
         }
-        if (model.ids[nearest] !== 'max') setBurst(null);
-        void commit(nearest);
+        const cueAtMax = !active.reachedMax && (active.position !== maxPosition || pendingMax.current);
+        pendingMax.current = false;
+        void commit(nearest, false, cueAtMax);
+      }
+
+      function settled(event) {
+        if (!isTrusted(event) || event.target !== event.currentTarget || event.propertyName !== progressProperty) return;
+        setNodeTravel(false);
+        showMaxAtArrival();
       }
 
       return h('div', null,
-        h('div', { className: 'dsh-hk-head', 'data-effort': effort },
+        h('div', { className: 'dsh-hk-head', 'data-effort': caption.has(effort) ? effort : undefined },
           team,
           h('div', { className: 'dsh-hk-meta' },
             h('strong', { className: 'dsh-hk-value', 'aria-hidden': true }, name),
             h('button', {
               type: 'button', className: 'dsh-hk-model-name', 'data-dsh-hk-model': '',
               title: modelName, 'aria-label': `切换模型，当前 ${modelName}`, onClick: showModels,
-            }, modelName, ' ›'),
+            }, noticeShowing ? h('span', { className: 'dsh-hk-max-notice', 'aria-hidden': true }, maxNotice) : `${modelName} ›`),
+            h('span', { className: 'dsh-hk-announcement', role: 'status' }, noticeShowing ? maxNotice : ''),
           ),
           h(NativeStyleButton, { onClick: showNative }),
         ),
         h('div', {
-          className: 'dsh-hk-rail', 'data-effort': effort, 'data-drag': dragging ? '' : undefined,
+          ref: rail, className: 'dsh-hk-rail', 'data-effort': caption.has(effort) ? effort : undefined,
+          'data-drag': dragging ? '' : undefined,
           'data-tap': nodeTravel ? '' : undefined,
           'data-node-hover': !blocked && hoveredNode !== null ? '' : undefined,
           style: {
-            '--dsh-hk-progress': position,
+            [progressProperty]: position,
             '--hk-steps': denominator,
             '--hk-high-stop': model.ids.indexOf('high'),
-            '--hk-max-stop': model.ids.indexOf('max'),
+            '--hk-max-stop': maxIndex,
           },
           onPointerDown: start, onPointerMove: move,
           onPointerLeave: () => setHoveredNode(null),
           onPointerUp: event => finish(event, true),
           onPointerCancel: event => finish(event, false),
           onLostPointerCapture: event => finish(event, false),
-          onTransitionEnd: event => {
-            if (event.propertyName === '--dsh-hk-progress') setNodeTravel(false);
-          },
+          onTransitionEnd: settled, onTransitionCancel: settled,
         },
           h('span', { className: 'dsh-hk-lane', 'aria-hidden': true },
             ...model.ids.map((id, stop) => h('i', {
@@ -726,10 +856,7 @@ window.__ModuleLoader__.load({
               )),
             ),
           ),
-          effort === 'max' && burst !== null && h('span', {
-            key: burst, className: 'dsh-hk-burst', 'aria-hidden': true,
-            onAnimationEnd: () => setBurst(current => current === burst ? null : current),
-          },
+          noticeShowing && h('span', { key: maxCue, className: 'dsh-hk-burst', 'aria-hidden': true },
             ...Array.from({ length: 10 }, (_, spark) => h('i', {
               key: spark,
               style: { '--hk-angle': `${spark * 36}deg`, '--hk-radius': `${22 + spark % 3 * 3}px` },
@@ -745,18 +872,10 @@ window.__ModuleLoader__.load({
             },
             onChange: event => {
               if (isTrusted(event) && !gesture.current) {
-                setBurst(null);
                 void commit(event.currentTarget.valueAsNumber);
               }
             },
           }),
-        ),
-        h('div', { className: 'dsh-hk-marks', 'aria-hidden': true, style: { '--hk-label-steps': denominator } },
-          ...model.ids.map((id, stop) => h('span', {
-            key: id ?? 'provider-default',
-            'data-selected': index === stop ? '' : undefined,
-            style: { '--hk-stop': stop / denominator },
-          }, model.entries.get(id))),
         ),
       );
     }
@@ -767,8 +886,8 @@ window.__ModuleLoader__.load({
       const addressedChild = useSession(snapshot => snapshot.subagent !== null);
       const listedChild = useSessions(snapshot => snapshot.byId[sessionId]?.origin === 'subagent');
       const allowed = available && !addressedChild && !listedChild;
-      const teamMode = useProjection('agentTeam');
-      const modelSelection = useProjection('modelSelection');
+      const teamEnabled = useProjection('agentTeam', value => value?.enabled);
+      const needsDisableConfirmation = useProjection('modelSelection', value => value == null ? undefined : value.lastUsed !== null);
       const model = getModel(state);
       const saved = state.current;
       const active = state.groups.find(group => group.id === saved?.provider)
@@ -778,27 +897,38 @@ window.__ModuleLoader__.load({
       const popup = useRef(null);
       const choosing = useRef(false);
       const writableSession = useRef(null);
+      const activePane = useRef(null);
       const dialogId = useId();
-      const anchorName = `--dsh-hk-${dialogId.replace(/[^a-zA-Z0-9_-]/g, '')}`;
-      const [view, setView] = useState(null);
-      const [error, reportFailure] = useState(null);
+      const anchorName = anchorNameFor(dialogId);
+      const [pane, setPane] = useState(null);
+      const [error, setError] = useState(null);
       const [saving, setSaving] = useState(false);
       const [providerKinds, setProviderKinds] = useState(() => new Map());
       const locked = props.locked || state.pending != null || saving;
-      const open = view !== null;
+      const open = pane !== null;
+      const view = pane?.view;
+      const isCurrentPane = () => pane !== null && activePane.current === pane;
+      const canWrite = () => isCurrentPane() && writableSession.current === sessionId;
+      const reportFailure = message => { if (isCurrentPane()) setError(message); };
 
       function select(selection) {
-        if (writableSession.current !== sessionId) return Promise.resolve(undefined);
+        if (!canWrite()) return Promise.resolve(undefined);
         return props.select(selection);
       }
 
       function close(returnFocus = true) {
-        setView(null);
+        if (!isCurrentPane()) return;
+        activePane.current = null;
+        setPane(null);
+        setError(null);
         if (returnFocus) trigger.current?.focus({ preventScroll: true });
       }
       function changeView(next) {
-        reportFailure(null);
-        setView(next);
+        const shown = { view: next };
+        activePane.current = shown;
+        setError(null);
+        setPane(shown);
+        return shown;
       }
       function launch(event) {
         if (!isTrusted(event) || !allowed) return;
@@ -807,11 +937,14 @@ window.__ModuleLoader__.load({
           return;
         }
         if (props.locked) return;
-        changeView(active ? 'effort' : 'models');
-        void load().catch(() => reportFailure('未能加载模型目录，请重试。'));
+        const shown = changeView(active ? 'effort' : 'models');
+        void load().catch(() => {
+          if (activePane.current === shown) setError('未能加载模型目录，请重试。');
+        });
       }
 
       function handleDialogKeys(event) {
+        if (!isTrusted(event) || !isCurrentPane()) return;
         if (event.key === 'Escape') {
           event.preventDefault();
           event.stopPropagation();
@@ -835,19 +968,20 @@ window.__ModuleLoader__.load({
 
       useLayoutEffect(() => {
         if (open) popup.current?.focus({ preventScroll: true });
-      }, [view]);
+      }, [pane]);
       useLayoutEffect(() => {
         writableSession.current = allowed && !props.locked ? sessionId : null;
         return () => { writableSession.current = null; };
       }, [allowed, props.locked, sessionId]);
+      useLayoutEffect(() => () => { activePane.current = null; }, []);
       useEffect(() => {
         if (!open) return;
         const outside = event => {
-          if (!trigger.current?.contains(event.target) && !popup.current?.contains(event.target)) close(false);
+          if (event.isTrusted && !trigger.current?.contains(event.target) && !popup.current?.contains(event.target)) close(false);
         };
         document.addEventListener('pointerdown', outside, true);
         return () => document.removeEventListener('pointerdown', outside, true);
-      }, [open]);
+      }, [pane]);
       useEffect(() => {
         setProviderKinds(new Map());
         if (!allowed || view !== 'models') return;
@@ -856,16 +990,20 @@ window.__ModuleLoader__.load({
         if (providerIds.size === 0) return;
         let active = true;
         void loadProviderKinds(providerIds).then(kinds => {
-          if (active) setProviderKinds(kinds);
+          if (active && isCurrentPane()) setProviderKinds(kinds);
         }).catch(() => { /* Leave providers under their catalog names. */ });
         return () => { active = false; };
-      }, [allowed, view, state.groups, loadProviderKinds]);
+      }, [allowed, pane, state.groups, loadProviderKinds]);
 
       async function choose(providerId, modelId) {
-        if (!allowed || locked || choosing.current) return;
+        if (!canWrite() || locked || choosing.current) return;
         const current = directory.getSnapshot();
         const picked = current.groups.find(group => group.id === providerId)?.models.find(option => option.id === modelId);
         if (!picked || current.pending) return;
+        if (current.current?.provider === providerId && current.current.model === modelId) {
+          changeView('effort');
+          return;
+        }
         const choice = { provider: providerId, model: modelId };
         if (typeof picked.reasoning?.defaultEffort === 'string') choice.reasoningEffort = picked.reasoning.defaultEffort;
         choosing.current = true;
@@ -874,7 +1012,7 @@ window.__ModuleLoader__.load({
         try {
           const result = await select(choice);
           if (result?.ok) {
-            setView(previous => previous === 'models' ? 'effort' : previous);
+            if (isCurrentPane()) changeView('effort');
           } else {
             reportFailure('未能切换模型，请重试。');
           }
@@ -887,30 +1025,27 @@ window.__ModuleLoader__.load({
       }
 
       if (!allowed) return null;
-      const team = typeof teamMode?.enabled === 'boolean'
+      const team = typeof teamEnabled === 'boolean'
         ? h(TeamSwitch, {
-          enabled: teamMode.enabled, disabled: locked || modelSelection == null,
-          history: modelSelection,
-          teamActions: () => writableSession.current === sessionId ? props.teamActions() : undefined,
+          enabled: teamEnabled, disabled: locked || needsDisableConfirmation === undefined,
+          needsDisableConfirmation,
+          teamActions: () => canWrite() ? props.teamActions() : undefined,
           reportFailure, close,
         }) : null;
-      const showModels = event => { if (isTrusted(event)) changeView('models'); };
+      const showModels = event => { if (isTrusted(event) && isCurrentPane()) changeView('models'); };
+      const showNative = () => { if (isCurrentPane()) props.showNative(); };
       const groups = view === 'models' ? state.groups.filter(group => group.models.length > 0)
         .toSorted((left, right) => (nativeProviders.get(left.id)?.order ?? 2) - (nativeProviders.get(right.id)?.order ?? 2)) : [];
       function renderProvider(group) {
-        const label = nativeProviders.get(group.id)?.label ?? (group.name || group.id);
+        const label = nativeProviders.get(group.id)?.label ?? group.name;
         return h('div', { key: group.id, role: 'group', 'aria-label': label },
           h('div', { className: 'dsh-hk-model-group' }, label),
           ...group.models.map(option => {
             const checked = group.id === saved?.provider && option.id === saved?.model;
             return h('button', {
-              key: option.id, type: 'button', 'data-dsh-hk-pick': option.id,
+              key: option.id, type: 'button', 'data-dsh-hk-pick': '',
               disabled: locked, 'aria-pressed': checked, title: option.name,
-              onClick: event => {
-                if (!isTrusted(event)) return;
-                if (checked) changeView('effort');
-                else void choose(group.id, option.id);
-              },
+              onClick: event => { if (isTrusted(event)) void choose(group.id, option.id); },
             }, h('span', null, option.name), checked && h(Mark, { checked: true }));
           }),
         );
@@ -928,11 +1063,15 @@ window.__ModuleLoader__.load({
           h('h2', { className: 'dsh-hk-model-heading' },
             h('button', {
               type: 'button', className: 'dsh-hk-back', 'aria-label': '返回',
-              onClick: () => active ? changeView('effort') : close(),
+              onClick: event => {
+                if (!isTrusted(event) || !isCurrentPane()) return;
+                if (active) changeView('effort');
+                else close();
+              },
             }, h(Mark)),
             '选择模型',
           ),
-          groups.length === 0 && h('p', { className: 'dsh-hk-empty' }, state.status === 'loading' ? '正在加载模型…' : '暂无可用模型'),
+          groups.length === 0 && h('p', { className: 'dsh-hk-empty' }, state.loading ? '正在加载模型…' : '暂无可用模型'),
           ...groups.filter(group => nativeProviders.has(group.id)).map(renderProvider),
           renderSource('thirdParty', '第三方模型提供商'),
           renderSource('custom', '自定义模型 API'),
@@ -941,7 +1080,7 @@ window.__ModuleLoader__.load({
         : model
           ? h(PanelBody, {
             key: JSON.stringify([model.provider, model.model]),
-            model, state, directory, team, select, locked, reportFailure, modelName, showModels, showNative: props.showNative,
+            model, state, directory, team, select, locked, reportFailure, modelName, showModels, showNative,
           })
           : h('div', { className: 'dsh-hk-head' },
             team,
@@ -951,7 +1090,7 @@ window.__ModuleLoader__.load({
               }, modelName, ' ›'),
               h('p', { className: 'dsh-hk-empty' }, '此模型没有可调的推理档位。'),
             ),
-            h(NativeStyleButton, { onClick: props.showNative }),
+            h(NativeStyleButton, { onClick: showNative }),
           );
 
       function triggerContents(effortLabel) {
@@ -970,18 +1109,18 @@ window.__ModuleLoader__.load({
           'aria-label': model ? `${modelName} ${model.entries.get(model.effort)}` : modelName,
           disabled: props.locked && !open,
           onClick: launch,
-          onKeyDown: event => { if (event.key === 'Escape' && open) { event.stopPropagation(); close(); } },
+          onKeyDown: event => { if (isTrusted(event) && event.key === 'Escape' && open) { event.stopPropagation(); close(); } },
         }, ...triggerContents(model?.entries.get(model.effort))),
         // Match the button's Off geometry without changing its visible caption or its hit target.
         h('span', {
           className: 'dsh-hk-trigger dsh-hk-off-anchor', 'aria-hidden': true, style: { anchorName },
         }, ...triggerContents('Off')),
         open && createPortal(h('section', {
-          id: dialogId, ref: popup, className: 'dsh-hk dsh-hk-popup', 'data-dsh-hk-popup': '',
+          id: dialogId, ref: popup, className: 'dsh-hk dsh-hk-popup', 'data-dsh-hk-popup': '', 'data-view': view,
           role: 'dialog', tabIndex: -1, 'aria-label': view === 'models' ? '切换模型' : '推理滑块',
           style: { '--hk-anchor': anchorName },
           onBlur: event => {
-            if (event.relatedTarget && !trigger.current?.contains(event.relatedTarget) &&
+            if (isTrusted(event) && event.relatedTarget && !trigger.current?.contains(event.relatedTarget) &&
                 !popup.current?.contains(event.relatedTarget)) close(false);
           },
           onKeyDown: handleDialogKeys,
@@ -1012,6 +1151,7 @@ window.__ModuleLoader__.load({
         let stopSeat;
         let stopRestore;
         let readProviderDirectory;
+        const writingSessions = new Set();
         ctx.inject(['remote', 'remote.llm'], scope => {
           scope.effect(() => {
             readProviderDirectory = () => scope.remote.llm.listConfigurableProviders();
@@ -1040,28 +1180,35 @@ window.__ModuleLoader__.load({
             priority: -10,
             inject(sessionId) {
               const directory = ctx.modelDirectories.directoryFor(sessionId);
+              const getSnapshot = modelSnapshot(directory.store);
               const available = ctx.sessions.subagentAddress(sessionId) === undefined;
               const canUse = () => active && registered && available && ctx.sessions.subagentAddress(sessionId) === undefined;
-              let writing = false;
-              const canWrite = () => canUse() && !writing && directory.store.getSnapshot().pending == null;
+              const canWrite = () => canUse() && !writingSessions.has(sessionId) && directory.store.getSnapshot().pending == null;
               async function write(operation) {
                 if (!canWrite()) return undefined;
-                writing = true;
+                writingSessions.add(sessionId);
                 try {
                   return await operation();
                 } finally {
-                  writing = false;
+                  writingSessions.delete(sessionId);
                 }
               }
               return {
                 available,
                 directory: {
                   subscribe: callback => directory.store.subscribe(callback),
-                  getSnapshot: () => directory.store.getSnapshot(),
+                  getSnapshot,
                 },
-                load: () => canUse() ? directory.load() : Promise.resolve(),
+                async load() { if (canUse()) await directory.load(); },
                 loadProviderKinds: providerIds => canUse() ? loadProviderKinds(providerIds) : Promise.resolve(new Map()),
-                select: selection => write(() => directory.select(selection)),
+                select: ({ provider, model, reasoningEffort }) => write(() => {
+                  const target = getSnapshot().groups.find(group => group.id === provider)?.models.find(option => option.id === model);
+                  if (!target || (reasoningEffort !== undefined && !target.reasoning?.efforts.some(level => level.id === reasoningEffort) &&
+                      target.reasoning?.defaultEffort !== reasoningEffort)) return undefined;
+                  const route = { provider, model };
+                  if (reasoningEffort !== undefined) route.reasoningEffort = reasoningEffort;
+                  return directory.select(route);
+                }),
                 teamActions() {
                   if (!canWrite()) return undefined;
                   // Pinned rc.5 native contribution owns both the save and the confirmation.
@@ -1077,7 +1224,9 @@ window.__ModuleLoader__.load({
                   if (typeof actions?.selectTeamMode !== 'function') return undefined;
                   return {
                     selectTeamMode: enabled => write(() => actions.selectTeamMode(enabled)),
-                    requestDisableConfirmation: confirmation ? actions.requestDisableConfirmation : undefined,
+                    requestDisableConfirmation: confirmation && typeof actions.requestDisableConfirmation === 'function'
+                      ? () => { if (canWrite()) actions.requestDisableConfirmation(); }
+                      : undefined,
                   };
                 },
                 showNative,

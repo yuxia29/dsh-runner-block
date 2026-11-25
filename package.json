@@ -1,6 +1,6 @@
 {
   "name": "dsh-huakuai",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "DeepSeek Harness 的推理档位滑块、模型选择和智能体团队开关",
   "license": "MIT",
   "type": "module",
