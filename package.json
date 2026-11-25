@@ -1,0 +1,33 @@
+{
+  "name": "dsh-huakuai",
+  "version": "1.0.0",
+  "description": "DeepSeek Harness 的推理档位滑块、模型选择和智能体团队开关",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "dsh": "0.2.2-rc.5"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yuxia29/dsh-runner-block.git"
+  },
+  "keywords": ["dsh-plugin", "deepseek-harness"],
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./package.json": "./package.json"
+  },
+  "files": ["index.js", "client.js", "cordis.patch.yml"],
+  "dsh": {
+    "bundle": { "patch": "./cordis.patch.yml" },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-conversation",
+        "@deepseek-ai/dsh-client-ui-model-selection",
+        "@deepseek-ai/dsh-client-locale"
+      ]
+    }
+  }
+}
